@@ -90,6 +90,9 @@
 #'                                Default = TRUE
 #' @param optimizeAtlasCache      Boolean to determine if the atlas cache has to be optimized. Default
 #'                                = FALSE
+#' @param optimizeCacheWithPersonCount  Boolean to determine if the atlas cache has to be optimized and must contain
+#'                                person count and descendant person count. Has no effect if optimizeAtlasCache is set to FALSE.
+#'                                Default = FALSE
 #' @param defaultAnalysesOnly     Boolean to determine if only default analyses should be run.
 #'                                Including non-default analyses is substantially more resource
 #'                                intensive.  Default = TRUE
@@ -132,6 +135,7 @@ achilles <- function(connectionDetails,
                      outputFolder = "output",
                      verboseMode = TRUE,
                      optimizeAtlasCache = FALSE,
+                     optimizeCacheWithPersonCount = FALSE,
                      defaultAnalysesOnly = TRUE) {
   totalStart <- Sys.time()
   achillesSql <- c()
@@ -982,7 +986,8 @@ achilles <- function(connectionDetails,
         outputFolder = outputFolder,
         sqlOnly = sqlOnly,
         verboseMode = verboseMode,
-        tempAchillesPrefix = tempAchillesPrefix
+        tempAchillesPrefix = tempAchillesPrefix,
+        optimizeCacheWithPersonCount = optimizeCacheWithPersonCount
       )
     
     achillesSql <- c(achillesSql, optimizeAtlasCacheSql)
@@ -1435,6 +1440,8 @@ dropAllScratchTables <- function(connectionDetails,
 #'                                Default = TRUE
 #' @param tempAchillesPrefix      The prefix to use for the "temporary" (but actually permanent)
 #'                                Achilles analyses tables. Default is "tmpach"
+#' @param optimizeCacheWithPersonCount  Boolean to determine if the atlas cache must contain
+#'                                person count and descendant person count. Default = FALSE
 #'
 #' @export
 optimizeAtlasCache <- function(connectionDetails,
@@ -1443,6 +1450,7 @@ optimizeAtlasCache <- function(connectionDetails,
                                outputFolder = "output",
                                sqlOnly = FALSE,
                                verboseMode = TRUE,
+                               optimizeCacheWithPersonCount = FALSE,
                                tempAchillesPrefix = "tmpach") {
   if (!dir.exists(outputFolder)) {
     dir.create(path = outputFolder, recursive = TRUE)
@@ -1475,19 +1483,26 @@ optimizeAtlasCache <- function(connectionDetails,
                                  appenders = appenders)
   ParallelLogger::registerLogger(logger)
   
+  schemaCsv <- "schema_achilles_results_concept_count.csv"
+  sqlFileName <- "analyses/create_result_concept_table.sql"
+
+  if (optimizeCacheWithPersonCount) {
+    schemaCsv <- "schema_achilles_results_person_concept_count.csv"
+    sqlFileName <- "analyses/create_result_person_concept_table.sql"
+  }
   resultsConceptCountTable <- list(tablePrefix = tempAchillesPrefix,
                                    schema = read.csv(
                                      file = system.file(
                                        "csv",
                                        "schemas",
-                                       "schema_achilles_results_concept_count.csv",
+                                       schemaCsv,
                                        package = "Achilles"
                                      ),
                                      header = TRUE
                                    ))
   optimizeAtlasCacheSql <-
     SqlRender::loadRenderTranslateSql(
-      sqlFilename = "analyses/create_result_concept_table.sql",
+      sqlFilename = sqlFileName,
       packageName = "Achilles",
       dbms = connectionDetails$dbms,
       resultsDatabaseSchema = resultsDatabaseSchema,
